@@ -1,6 +1,6 @@
 defmodule Marvel.API.Base do
   @moduledoc false
-  
+
   defmacro __using__(opts) do
     quote do
       alias Marvel.API.Base
@@ -8,7 +8,7 @@ defmodule Marvel.API.Base do
       @doc """
       Fetches lists
       """
-      @spec list(map) :: map
+      @spec list(map) :: {:ok, map()} | {:error, any()}
       def list(params \\ %{}) do
         Marvel.API.Base.get(unquote(opts[:entity]), params)
       end
@@ -16,7 +16,7 @@ defmodule Marvel.API.Base do
       @doc """
       Fetches a single entity by id
       """
-      @spec get(integer, map) :: map
+      @spec get(integer, map) :: {:ok, map()} | {:error, any()}
       def get(id, params \\ %{}) do
         Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}", params)
       end
@@ -25,7 +25,7 @@ defmodule Marvel.API.Base do
         @doc """
         Fetches lists of characters filtered by id
         """
-        @spec characters(integer, map) :: map
+        @spec characters(integer, map) :: {:ok, map()} | {:error, any()}
         def characters(id, params \\ %{}) do
           Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}/characters", params)
         end
@@ -35,17 +35,17 @@ defmodule Marvel.API.Base do
         @doc """
         Fetches lists of comics filtered by id
         """
-        @spec comics(integer, map) :: map
+        @spec comics(integer, map) :: {:ok, map()} | {:error, any()}
         def comics(id, params \\ %{}) do
           Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}/comics", params)
         end
       end
 
-      if unquote(opts[:entity]) != "creators" && unquote(opts[:entity]) != "characters"  do
+      if unquote(opts[:entity]) != "creators" && unquote(opts[:entity]) != "characters" do
         @doc """
         Fetches lists of creators filtered by id
         """
-        @spec creators(integer, map) :: map
+        @spec creators(integer, map) :: {:ok, map()} | {:error, any()}
         def creators(id, params \\ %{}) do
           Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}/creators", params)
         end
@@ -55,7 +55,7 @@ defmodule Marvel.API.Base do
         @doc """
         Fetches lists of events filtered by id
         """
-        @spec events(integer, map) :: map
+        @spec events(integer, map) :: {:ok, map()} | {:error, any()}
         def events(id, params \\ %{}) do
           Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}/events", params)
         end
@@ -65,7 +65,7 @@ defmodule Marvel.API.Base do
         @doc """
         Fetches lists of series filtered by id
         """
-        @spec series(integer, map) :: map
+        @spec series(integer, map) :: {:ok, map()} | {:error, any()}
         def series(id, params \\ %{}) do
           Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}/series", params)
         end
@@ -75,7 +75,7 @@ defmodule Marvel.API.Base do
         @doc """
         Fetches lists of stories filtered by id
         """
-        @spec stories(integer, map) :: map
+        @spec stories(integer, map) :: {:ok, map()} | {:error, any()}
         def stories(id, params \\ %{}) do
           Marvel.API.Base.get("#{unquote(opts[:entity])}/#{id}/stories", params)
         end
@@ -92,28 +92,33 @@ defmodule Marvel.API.Base do
   end
 
   defp timestamp do
-    round(Timex.Time.now(:secs))
+    :erlang.system_time(:second)
   end
 
   def get(url, params) do
-    base_url = "http://gateway.marvel.com:80/v1/public"
+    base_url = "https://gateway.marvel.com/v1/public"
 
-    ts = timestamp
-    apikey = public_key
+    ts = timestamp()
+    apikey = public_key()
 
-    hash = :crypto.hash(:md5, "#{ts}#{private_key}#{apikey}") 
-    |> Base.encode16(case: :lower)
+    hash =
+      :crypto.hash(:md5, "#{ts}#{private_key()}#{apikey}")
+      |> Base.encode16(case: :lower)
 
-    params = Map.merge(params, %{ts: ts, apikey: apikey, hash: hash})
-    |> URI.encode_query
+    params =
+      Map.merge(params, %{ts: ts, apikey: apikey, hash: hash})
+      |> URI.encode_query()
 
     case HTTPoison.get("#{base_url}/#{url}?#{params}") do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        {:ok, Poison.decode!(body) }
-      {:ok, %HTTPoison.Response{status_code: status_code, body: body}} when status_code in 401..409 ->
-        {:error, Poison.decode!(body) }
+        {:ok, Poison.decode!(body)}
+
+      {:ok, %HTTPoison.Response{status_code: status_code, body: body}}
+      when status_code in 401..409 ->
+        {:error, Poison.decode!(body)}
+
       {:error, %HTTPoison.Error{reason: reason}} ->
-        {:error, %{"message": reason} }
+        {:error, %{message: reason}}
     end
   end
 end

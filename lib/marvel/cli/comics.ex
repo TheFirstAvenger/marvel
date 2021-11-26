@@ -1,6 +1,6 @@
 defmodule Marvel.CLI.Comics do
   @moduledoc false
-  
+
   alias Marvel.CLI.Utils
 
   def list() do
